@@ -51,16 +51,40 @@ function cleanupReportCache() {
 cleanupReportCache();
 
 function tryRequirePlaywright() {
-  try {
-    return require("playwright");
-  } catch (_) {
+  for (const name of ["playwright-core", "playwright"]) {
     try {
-      const req = Module.createRequire(path.join(BUNDLED_NODE_MODULES, "package.json"));
-      return req("playwright");
-    } catch (error) {
-      return null;
-    }
+      return require(name);
+    } catch (_) {}
   }
+  try {
+    const req = Module.createRequire(path.join(BUNDLED_NODE_MODULES, "package.json"));
+    return req("playwright");
+  } catch (_) {
+    return null;
+  }
+}
+
+function findBundledChromiumExecutable() {
+  const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, "/ms-playwright"].filter(Boolean);
+  for (const root of roots) {
+    try {
+      if (!fs.existsSync(root)) continue;
+      const dirs = fs.readdirSync(root).filter((name) => /^chromium-/.test(name)).sort().reverse();
+      for (const dir of dirs) {
+        const candidate = path.join(root, dir, "chrome-linux", "chrome");
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    } catch (_) {}
+  }
+  return "";
+}
+
+function chromiumLaunchOptions() {
+  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findBundledChromiumExecutable();
+  return {
+    headless: true,
+    ...(executablePath ? { executablePath } : {})
+  };
 }
 
 function jsonResponse(res, status, body) {
@@ -1894,7 +1918,7 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
   let browser;
   try {
     const { chromium, devices } = playwright;
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch(chromiumLaunchOptions());
     const rules = countryRules(country);
     const context = await browser.newContext({
       ...devices["iPhone 13"],

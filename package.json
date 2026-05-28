@@ -12,6 +12,6 @@
   },
   "dependencies": {
     "@clerk/backend": "^2.12.1",
-    "playwright": "1.60.0"
+    "playwright-core": "1.60.0"
   }
 }
