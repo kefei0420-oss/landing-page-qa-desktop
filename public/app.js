@@ -226,15 +226,12 @@ async function initAuth() {
     if (!authState.enabled) return;
     setToolLocked(true);
     runtimeStatus.textContent = "登录检查";
-    const frontendApi = clerkFrontendApiFromKey(config.clerkPublishableKey);
-    await loadScript("https://cdn.jsdelivr.net/npm/@clerk/ui@latest/dist/clerk.browser.js");
     await loadScript("https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js", {
-      "data-clerk-publishable-key": config.clerkPublishableKey,
-      ...(frontendApi ? { "data-clerk-frontend-api": frontendApi } : {})
+      "data-clerk-publishable-key": config.clerkPublishableKey
     });
     const clerk = window.Clerk;
     if (!clerk || typeof clerk.load !== "function") throw new Error("Clerk SDK 未正确加载");
-    await clerk.load({ publishableKey: config.clerkPublishableKey });
+    await clerk.load();
     authState.clerk = clerk;
     authState.ready = true;
     authState.signedIn = Boolean(clerk.user);
