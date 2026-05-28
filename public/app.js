@@ -246,11 +246,20 @@ function renderSignedInState() {
     return;
   }
   setToolLocked(false);
-  runtimeStatus.textContent = "待命";
+  runtimeStatus.textContent = "已授权";
   const mount = document.querySelector("#authMount");
   if (mount && authState.clerk) {
-    mount.innerHTML = "";
-    authState.clerk.mountUserButton(mount);
+    mount.innerHTML = `
+      <div class="auth-status">
+        <div class="auth-status-copy">
+          <span>已登录 · 白名单通过</span>
+          <strong>${safeHtml(email || "Authorized user")}</strong>
+        </div>
+        <div class="user-button-mount" id="userButtonMount"></div>
+      </div>
+    `;
+    const buttonMount = mount.querySelector("#userButtonMount");
+    if (buttonMount) authState.clerk.mountUserButton(buttonMount);
   }
   if (resultPanel.querySelector(".auth-state")) {
     resultPanel.innerHTML = `
