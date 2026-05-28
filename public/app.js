@@ -333,6 +333,20 @@ async function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers });
 }
 
+async function readApiJson(response) {
+  const text = await response.text();
+  if (!text.trim()) {
+    const statusText = response.status ? `HTTP ${response.status}` : "空响应";
+    throw new Error(`${statusText}：服务器没有返回内容，可能是 Render 冷启动、部署中断或接口超时。请刷新后重试。`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    const preview = text.replace(/\s+/g, " ").trim().slice(0, 220);
+    throw new Error(`接口返回的不是 JSON：${preview || "空内容"}`);
+  }
+}
+
 initAuth();
 
 
@@ -810,7 +824,7 @@ form.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     if (!response.ok) throw new Error(data.error || "Check failed");
     renderReport(data);
     runtimeStatus.textContent = "完成";
@@ -871,7 +885,7 @@ document.addEventListener("click", async (event) => {
         deep
       })
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     if (!response.ok) throw new Error(data.error || "Competitor search failed");
     renderCompetitorResults(data);
   } catch (error) {
