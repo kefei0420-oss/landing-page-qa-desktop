@@ -2021,3 +2021,511 @@ body {
   display: grid;
   justify-items: start;
 }
+
+
+/* Mobile polish: keep the desktop personality, but make the console usable on phones. */
+@media (hover: none) and (pointer: coarse) {
+  body {
+    cursor: default;
+  }
+
+  .cursor-dot {
+    display: none;
+  }
+
+  .panel:hover,
+  .analysis-card:hover,
+  .summary-card:hover,
+  .metric-strip div:hover,
+  .intel-tile:hover,
+  .preview-shot:hover,
+  .competitor-link:hover,
+  .primary-page-link:hover,
+  button:hover,
+  .market-option:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --shadow: 4px 4px 0 #1b1810;
+    --hot-shadow: 4px 4px 0 #1b1810;
+  }
+
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-size: 16px 16px;
+  }
+
+  .shell {
+    width: 100%;
+    min-height: 100svh;
+    padding: 12px;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  h1 {
+    font-size: clamp(28px, 9vw, 36px);
+    line-height: 1;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .product-name-en {
+    font-size: 11px;
+  }
+
+  .subtitle {
+    max-width: none;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .status-pill {
+    min-width: 78px;
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .panel,
+  .analysis-card,
+  .summary-card,
+  .metric-strip div,
+  .intel-tile {
+    box-shadow: 4px 4px 0 var(--line);
+  }
+
+  .panel::after,
+  .analysis-card::after,
+  .summary-card::after {
+    display: none;
+  }
+
+  .command-bar,
+  .control-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .command-title {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 4px solid var(--line);
+    padding: 0 0 10px;
+  }
+
+  .command-title strong {
+    font-size: 20px;
+  }
+
+  label {
+    gap: 5px;
+    min-width: 0;
+  }
+
+  input,
+  select,
+  button {
+    min-height: 42px;
+    font-size: 13px;
+  }
+
+  input,
+  select {
+    padding: 8px 9px;
+  }
+
+  .execute-btn,
+  .competitor-search-btn,
+  .competitor-deep-btn {
+    width: 100%;
+  }
+
+  .market-combobox {
+    z-index: 140;
+  }
+
+  .market-menu {
+    left: -1px;
+    right: -1px;
+    max-height: min(52svh, 360px);
+    grid-template-columns: 1fr;
+    overscroll-behavior: contain;
+  }
+
+  .result-panel {
+    min-height: calc(100svh - 224px);
+    padding: 10px;
+  }
+
+  .empty-state {
+    min-height: calc(100svh - 266px);
+    place-content: start center;
+    padding: 18px 0;
+  }
+
+  .idle-card,
+  .scanner-card,
+  .auth-card {
+    width: min(100%, calc(100vw - 36px));
+    padding: 22px 16px 18px;
+    box-shadow: 6px 6px 0 var(--line);
+    transform: none;
+  }
+
+  .idle-card > *,
+  .scanner-card > * {
+    transform: none;
+  }
+
+  .empty-state h2,
+  .auth-card h2 {
+    font-size: clamp(26px, 8vw, 34px);
+    line-height: 1.05;
+  }
+
+  .scan-window,
+  .scan-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-shell {
+    gap: 10px;
+  }
+
+  .summary-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .summary-card h2 {
+    font-size: clamp(21px, 6vw, 26px);
+    line-height: 1.14;
+    overflow-wrap: anywhere;
+  }
+
+  .summary-card p {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .score-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: start;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 10px 12px;
+  }
+
+  .score-card span,
+  .score-card em {
+    grid-column: 1;
+  }
+
+  .score-card strong {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin: 0;
+    font-size: 40px;
+  }
+
+  .intel-strip {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .intel-tile {
+    min-height: 70px;
+    padding: 10px;
+  }
+
+  .intel-tile strong {
+    font-size: 22px;
+  }
+
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .metric-strip div {
+    min-height: 66px;
+    padding: 10px;
+  }
+
+  .metric-strip strong {
+    font-size: 15px;
+  }
+
+  .analysis-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "conclusion"
+      "offer"
+      "trust"
+      "locale"
+      "gaps"
+      "preview";
+    gap: 10px;
+  }
+
+  .analysis-card {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .card-head {
+    min-height: 30px;
+    margin-bottom: 10px;
+  }
+
+  .card-head h3 {
+    font-size: 15px;
+    padding: 5px 10px 4px;
+  }
+
+  .card-priority {
+    padding: 9px 10px;
+  }
+
+  .card-priority strong,
+  .flip-face > strong {
+    font-size: 14px;
+  }
+
+  .two-col,
+  .evidence-block,
+  .device-console,
+  .competitor-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locale-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .category-chip {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .category-chip em,
+  .category-chip small {
+    grid-column: 1;
+  }
+
+  .offer-row {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  li,
+  .empty-note,
+  .offer-row strong,
+  .competitor-link em {
+    font-size: 12px;
+  }
+
+  .core-flip,
+  .core-flip .flip-card-inner {
+    min-height: 218px;
+  }
+
+  .core-flip .flip-face {
+    padding: 52px 14px 16px;
+  }
+
+  .core-flip .flip-toggle {
+    right: 12px;
+    top: 12px;
+    min-width: 68px;
+  }
+
+  .core-flip .flip-face > strong,
+  .core-flip .flip-back > strong {
+    max-height: 142px;
+    -webkit-line-clamp: 6;
+  }
+
+  .device-frame {
+    min-height: 196px;
+    padding: 10px;
+  }
+
+  .mobile-device .device-frame {
+    max-width: 210px;
+  }
+
+  .device-frame .screenshot,
+  .desktop-device .screenshot {
+    height: 164px;
+  }
+
+  .preview-lightbox {
+    padding: 12px;
+  }
+
+  .lightbox-close {
+    right: 12px;
+    top: 12px;
+  }
+
+  .lightbox-frame {
+    width: calc(100vw - 24px);
+    max-height: 88svh;
+    padding: 10px;
+    box-shadow: 6px 6px 0 var(--line);
+  }
+
+  .lightbox-frame img {
+    max-height: calc(88svh - 72px);
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    padding: 8px;
+  }
+
+  .workspace {
+    gap: 10px;
+  }
+
+  .topbar-actions {
+    align-items: stretch;
+  }
+
+  .auth-mount:not(:empty) {
+    min-width: 40px;
+  }
+
+  .command-bar,
+  .result-panel,
+  .analysis-card,
+  .summary-card {
+    border-width: 2px;
+  }
+
+  .command-title,
+  .panel-head {
+    border-bottom-width: 3px;
+  }
+
+  input,
+  select,
+  button {
+    border-width: 2px;
+  }
+
+  .status-pill,
+  .sticker,
+  .slant-tag,
+  .card-head h3,
+  .preview-shot span,
+  .device-label,
+  .market-option,
+  .locale-grid div,
+  .offer-row,
+  .empty-note,
+  .issue,
+  .score-row,
+  .competitor-meta span,
+  .query-stack span {
+    border-width: 2px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .command-title strong {
+    font-size: 18px;
+  }
+
+  .metric-strip,
+  .locale-grid,
+  .scan-window,
+  .scan-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .score-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .score-card strong {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 38px;
+  }
+
+  .sticker-row,
+  .competitor-meta,
+  .query-stack {
+    gap: 6px;
+  }
+
+  .sticker,
+  .query-stack span,
+  .competitor-meta span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .offer-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .offer-row span {
+    width: fit-content;
+  }
+
+  .core-flip,
+  .core-flip .flip-card-inner {
+    min-height: 244px;
+  }
+
+  .core-flip .flip-face > strong,
+  .core-flip .flip-back > strong {
+    max-height: 168px;
+    -webkit-line-clamp: 7;
+  }
+
+  .device-console {
+    gap: 10px;
+  }
+
+  .desktop-device .device-frame {
+    min-height: 176px;
+  }
+
+  .device-frame .screenshot,
+  .desktop-device .screenshot {
+    height: 148px;
+  }
+
+  .competitor-link {
+    min-height: auto;
+  }
+}
