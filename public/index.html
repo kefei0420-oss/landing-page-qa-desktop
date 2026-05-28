@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>落地页情报台 · Landing Intel Console</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>落地页情报台</h1>
+          <div class="product-name-en">Landing Intel Console</div>
+          <p class="subtitle">输入一个落地页，自动提取市场货币、产品信息、促销价格、竞品线索和页面风险。</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="auth-mount" id="authMount"></div>
+          <div class="status-pill" id="runtimeStatus">待命</div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form id="qaForm" class="panel control-panel command-bar">
+          <div class="command-title">
+            <span>SCAN CMD</span>
+            <strong>扫描指令台</strong>
+          </div>
+
+          <label class="url-field">
+            <span>URL</span>
+            <input id="url" name="url" type="url" placeholder="粘贴商品页 / PDP / 活动页链接，按执行开始扫描" autocomplete="url" required>
+          </label>
+
+          <label class="market-field market-combobox" id="marketCombobox">
+            <span>目标市场</span>
+            <input id="countrySearch" type="text" placeholder="自动识别 / 搜索国家或地区" autocomplete="off" role="combobox" aria-expanded="false">
+            <input id="country" name="country" type="hidden" value="AUTO">
+            <div class="market-menu" id="marketMenu" role="listbox"></div>
+          </label>
+
+          <label class="focus-field">
+            <span>FOCUS</span>
+            <input id="keywords" name="keywords" placeholder="可选：free shipping, warranty, waterproof">
+          </label>
+
+          <button id="submitBtn" class="execute-btn" type="submit">执行扫描</button>
+        </form>
+
+        <section class="panel result-panel" id="resultPanel">
+          <div class="empty-state idle-state">
+            <div class="idle-card">
+              <span class="slant-tag">IDLE</span>
+              <h2>READY TO SCAN</h2>
+              <p>丢一个落地页 URL 进来，系统会抓产品信息、促销价格、风险和首屏截图。</p>
+              <div class="scan-window">
+                <span>PRODUCT</span>
+                <span>OFFER</span>
+                <span>TRUST</span>
+                <span>RISK</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
