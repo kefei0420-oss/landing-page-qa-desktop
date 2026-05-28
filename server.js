@@ -105,6 +105,38 @@ function clerkAuthEnabled() {
   return hasRealEnvValue(process.env.CLERK_SECRET_KEY) && hasRealEnvValue(process.env.CLERK_PUBLISHABLE_KEY);
 }
 
+function allowedEmails() {
+  return String(process.env.ALLOWED_EMAILS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function primaryEmailFromClerkPayload(payload) {
+  const direct = payload && (payload.email || payload.email_address || payload.emailAddress);
+  if (direct) return String(direct).toLowerCase();
+  const claims = payload && payload.claims && typeof payload.claims === "object" ? payload.claims : {};
+  const claimEmail = claims.email || claims.email_address || claims.emailAddress;
+  if (claimEmail) return String(claimEmail).toLowerCase();
+  return "";
+}
+
+async function fetchClerkUserPrimaryEmail(userId) {
+  if (!userId || !hasRealEnvValue(process.env.CLERK_SECRET_KEY)) return "";
+  try {
+    const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
+    });
+    if (!response.ok) return "";
+    const user = await response.json();
+    const emails = Array.isArray(user.email_addresses) ? user.email_addresses : [];
+    const primary = emails.find((item) => item.id === user.primary_email_address_id) || emails[0];
+    return String(primary && primary.email_address || "").toLowerCase();
+  } catch (_) {
+    return "";
+  }
+}
+
 function getBearerToken(req) {
   const header = req.headers.authorization || req.headers.Authorization || "";
   const match = String(header).match(/^Bearer\s+(.+)$/i);
@@ -125,7 +157,15 @@ async function verifyClerkRequest(req) {
       secretKey: process.env.CLERK_SECRET_KEY,
       ...(authorizedParties.length ? { authorizedParties } : {})
     });
-    return { ok: true, userId: payload.sub, payload };
+    let email = primaryEmailFromClerkPayload(payload);
+    const allowlist = allowedEmails();
+    if (allowlist.length && !email) {
+      email = await fetchClerkUserPrimaryEmail(payload.sub);
+    }
+    if (allowlist.length && (!email || !allowlist.includes(email))) {
+      return { ok: false, status: 403, error: "这个邮箱没有访问权限。" };
+    }
+    return { ok: true, userId: payload.sub, email, payload };
   } catch (error) {
     return { ok: false, status: 401, error: "登录状态无效，请重新登录。" };
   }
@@ -141,9 +181,12 @@ async function requireApiAuth(req, res) {
 }
 
 function publicRuntimeConfig() {
+  const allowlist = allowedEmails();
   return {
     authEnabled: clerkAuthEnabled(),
-    clerkPublishableKey: clerkAuthEnabled() ? process.env.CLERK_PUBLISHABLE_KEY : ""
+    clerkPublishableKey: clerkAuthEnabled() ? process.env.CLERK_PUBLISHABLE_KEY : "",
+    allowlistEnabled: allowlist.length > 0,
+    allowedEmailDomains: Array.from(new Set(allowlist.map((email) => email.split("@")[1]).filter(Boolean))).slice(0, 8)
   };
 }
 
@@ -2283,6 +2326,13 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === "GET" && req.url === "/api/config") {
     jsonResponse(res, 200, publicRuntimeConfig());
+    return;
+  }
+  if (req.method === "GET" && req.url === "/api/me") {
+    requireApiAuth(req, res).then((auth) => {
+      if (!auth) return;
+      jsonResponse(res, 200, { ok: true, email: auth.email || "", userId: auth.userId });
+    }).catch((error) => jsonResponse(res, 500, { error: error.message }));
     return;
   }
   if (req.method === "POST" && req.url === "/api/check") {

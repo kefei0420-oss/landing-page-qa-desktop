@@ -27,3 +27,5 @@ services:
         sync: false
       - key: CLERK_AUTHORIZED_PARTIES
         sync: false
+      - key: ALLOWED_EMAILS
+        sync: false

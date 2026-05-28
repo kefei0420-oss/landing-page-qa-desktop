@@ -12,6 +12,9 @@ const authState = {
   enabled: false,
   ready: false,
   signedIn: true,
+  allowed: true,
+  allowlistEnabled: false,
+  allowedEmailDomains: [],
   clerk: null
 };
 const cursorDot = document.createElement("div");
@@ -178,6 +181,31 @@ function setToolLocked(locked) {
   }
 }
 
+function currentUserEmail() {
+  const user = authState.clerk && authState.clerk.user;
+  const primaryId = user && user.primaryEmailAddressId;
+  const primary = user && Array.isArray(user.emailAddresses)
+    ? user.emailAddresses.find((item) => item.id === primaryId) || user.emailAddresses[0]
+    : null;
+  return String((primary && primary.emailAddress) || user?.emailAddress || "").toLowerCase();
+}
+
+function renderAccessDenied(email = "") {
+  setToolLocked(true);
+  runtimeStatus.textContent = "无权限";
+  const domains = authState.allowedEmailDomains.length ? `当前只开放给：${authState.allowedEmailDomains.join(" / ")}` : "当前账号不在访问白名单里。";
+  resultPanel.innerHTML = `
+    <div class="empty-state auth-state">
+      <div class="auth-card denied-card">
+        <span class="slant-tag">ACCESS DENIED</span>
+        <h2>没有访问权限</h2>
+        <p>${safeHtml(email || "当前账号")} 不在白名单里。${safeHtml(domains)}</p>
+        <button class="competitor-deep-btn" type="button" data-action="sign-out">切换账号</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderSignedOutGate() {
   setToolLocked(true);
   runtimeStatus.textContent = "需登录";
@@ -195,7 +223,28 @@ function renderSignedOutGate() {
   if (mount && authState.clerk) authState.clerk.mountSignIn(mount);
 }
 
+async function refreshAccess() {
+  if (!authState.enabled || !authState.signedIn) {
+    authState.allowed = true;
+    return true;
+  }
+  try {
+    const response = await apiFetch(`${API_BASE}/api/me`);
+    authState.allowed = response.ok;
+    if (!response.ok) return false;
+    return true;
+  } catch (_) {
+    authState.allowed = false;
+    return false;
+  }
+}
+
 function renderSignedInState() {
+  const email = currentUserEmail();
+  if (!authState.allowed) {
+    renderAccessDenied(email);
+    return;
+  }
   setToolLocked(false);
   runtimeStatus.textContent = "待命";
   const mount = document.querySelector("#authMount");
@@ -224,6 +273,8 @@ async function initAuth() {
     const response = await fetch(`${API_BASE}/api/config`);
     const config = await response.json();
     authState.enabled = Boolean(config.authEnabled && config.clerkPublishableKey);
+    authState.allowlistEnabled = Boolean(config.allowlistEnabled);
+    authState.allowedEmailDomains = Array.isArray(config.allowedEmailDomains) ? config.allowedEmailDomains : [];
     if (!authState.enabled) return;
     setToolLocked(true);
     runtimeStatus.textContent = "登录检查";
@@ -239,18 +290,34 @@ async function initAuth() {
     authState.clerk = clerk;
     authState.ready = true;
     authState.signedIn = Boolean(clerk.user);
-    clerk.addListener(({ user }) => {
+    authState.allowed = !authState.allowlistEnabled;
+    clerk.addListener(async ({ user }) => {
       authState.signedIn = Boolean(user);
-      if (authState.signedIn) renderSignedInState();
-      else renderSignedOutGate();
+      if (authState.signedIn) {
+        await refreshAccess();
+        renderSignedInState();
+      } else {
+        renderSignedOutGate();
+      }
     });
-    if (authState.signedIn) renderSignedInState();
-    else renderSignedOutGate();
+    if (authState.signedIn) {
+      await refreshAccess();
+      renderSignedInState();
+    } else {
+      renderSignedOutGate();
+    }
   } catch (error) {
     resultPanel.innerHTML = `<div class="error">登录组件加载失败：${safeHtml(error.message)}</div>`;
     runtimeStatus.textContent = "登录异常";
   }
 }
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-action="sign-out"]');
+  if (!button || !authState.clerk) return;
+  await authState.clerk.signOut();
+  window.location.reload();
+});
 
 async function authHeaders() {
   if (!authState.enabled) return {};
