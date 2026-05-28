@@ -133,22 +133,41 @@ function safeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-function loadScript(src) {
+function loadScript(src, attributes = {}) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
-      existing.addEventListener("load", resolve, { once: true });
-      existing.addEventListener("error", reject, { once: true });
+      if (existing.dataset.loaded === "true") resolve();
+      else {
+        existing.addEventListener("load", resolve, { once: true });
+        existing.addEventListener("error", reject, { once: true });
+      }
       return;
     }
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
     script.crossOrigin = "anonymous";
-    script.addEventListener("load", resolve, { once: true });
+    for (const [key, value] of Object.entries(attributes)) {
+      if (value !== undefined && value !== null) script.setAttribute(key, value);
+    }
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "true";
+      resolve();
+    }, { once: true });
     script.addEventListener("error", reject, { once: true });
     document.head.appendChild(script);
   });
+}
+
+function clerkFrontendApiFromKey(publishableKey) {
+  try {
+    const encoded = String(publishableKey || "").replace(/^pk_(?:test|live)_/, "");
+    const decoded = atob(encoded).replace(/\$$/, "");
+    return decoded || "";
+  } catch (_) {
+    return "";
+  }
 }
 
 function setToolLocked(locked) {
@@ -207,9 +226,15 @@ async function initAuth() {
     if (!authState.enabled) return;
     setToolLocked(true);
     runtimeStatus.textContent = "登录检查";
-    await loadScript("https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js");
-    const clerk = new window.Clerk(config.clerkPublishableKey);
-    await clerk.load();
+    const frontendApi = clerkFrontendApiFromKey(config.clerkPublishableKey);
+    await loadScript("https://cdn.jsdelivr.net/npm/@clerk/ui@latest/dist/clerk.browser.js");
+    await loadScript("https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js", {
+      "data-clerk-publishable-key": config.clerkPublishableKey,
+      ...(frontendApi ? { "data-clerk-frontend-api": frontendApi } : {})
+    });
+    const clerk = window.Clerk;
+    if (!clerk || typeof clerk.load !== "function") throw new Error("Clerk SDK 未正确加载");
+    await clerk.load({ publishableKey: config.clerkPublishableKey });
     authState.clerk = clerk;
     authState.ready = true;
     authState.signedIn = Boolean(clerk.user);
