@@ -64,15 +64,32 @@ function tryRequirePlaywright() {
   }
 }
 
+function requireDiagnostics(name) {
+  try {
+    return { available: true, path: require.resolve(name) };
+  } catch (error) {
+    return { available: false, error: error.message };
+  }
+}
+
 function findBundledChromiumExecutable() {
   const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, "/ms-playwright"].filter(Boolean);
   for (const root of roots) {
     try {
       if (!fs.existsSync(root)) continue;
-      const dirs = fs.readdirSync(root).filter((name) => /^chromium-/.test(name)).sort().reverse();
+      const dirs = fs.readdirSync(root).filter((name) => /^chromium/.test(name)).sort().reverse();
       for (const dir of dirs) {
-        const candidate = path.join(root, dir, "chrome-linux", "chrome");
-        if (fs.existsSync(candidate)) return candidate;
+        const candidates = [
+          path.join(root, dir, "chrome-linux", "chrome"),
+          path.join(root, dir, "chrome-linux", "headless_shell"),
+          path.join(root, dir, "chrome-linux", "chrome-wrapper"),
+          path.join(root, dir, "chrome-linux", "chromium"),
+          path.join(root, dir, "chromium-linux", "chrome"),
+          path.join(root, dir, "chromium-linux", "headless_shell")
+        ];
+        for (const candidate of candidates) {
+          if (fs.existsSync(candidate)) return candidate;
+        }
       }
     } catch (_) {}
   }
@@ -83,7 +100,32 @@ function chromiumLaunchOptions() {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findBundledChromiumExecutable();
   return {
     headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
     ...(executablePath ? { executablePath } : {})
+  };
+}
+
+function playwrightRuntimeDiagnostics(extra = {}) {
+  const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, "/ms-playwright"].filter(Boolean);
+  const browserRoots = roots.map((root) => {
+    let exists = false;
+    let entries = [];
+    try {
+      exists = fs.existsSync(root);
+      entries = exists ? fs.readdirSync(root).slice(0, 20) : [];
+    } catch (error) {
+      entries = [`read error: ${error.message}`];
+    }
+    return { root, exists, entries };
+  });
+  return {
+    ...extra,
+    node: process.version,
+    platform: `${process.platform}/${process.arch}`,
+    playwrightCore: requireDiagnostics("playwright-core"),
+    playwright: requireDiagnostics("playwright"),
+    chromiumExecutablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findBundledChromiumExecutable(),
+    browserRoots
   };
 }
 
@@ -1855,6 +1897,8 @@ function scoreReport(checks, keywordResults, loadMs) {
 }
 
 async function fallbackCheck(targetUrl, country, keywords, startedAt, reason) {
+  const runtimeDiagnostics = playwrightRuntimeDiagnostics({ fallbackReason: reason });
+  console.error("Playwright fallback:", JSON.stringify(runtimeDiagnostics, null, 2));
   const response = await fetch(targetUrl, { redirect: "follow" });
   const html = await response.text();
   const analysisMs = Date.now() - startedAt;
@@ -1937,6 +1981,7 @@ async function fallbackCheck(targetUrl, country, keywords, startedAt, reason) {
     loadMs,
     analysisMs,
     loadMetrics: { source: "http-fetch", note: "Fallback 模式只能记录抓取耗时，不代表真实浏览器加载。" },
+    runtimeDiagnostics,
     screenshotPath: null,
     desktopScreenshotPath: null,
     languageHint: rules.languageHint,
@@ -2220,6 +2265,7 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       loadMs,
       analysisMs,
       loadMetrics,
+      runtimeDiagnostics: playwrightRuntimeDiagnostics({ mode: "playwright" }),
       popupDismissal,
       screenshotPath: `reports/${screenshotFile}?t=${Date.now()}`,
       desktopScreenshotPath: `reports/${desktopScreenshotFile}?t=${Date.now()}`,

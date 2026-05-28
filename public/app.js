@@ -509,6 +509,24 @@ function renderPreviewShot(label, path, emptyText) {
   `;
 }
 
+function renderScreenshotDiagnostics(report) {
+  if (!report || report.mode !== "http-fallback") return "";
+  const diagnostics = report.runtimeDiagnostics || {};
+  const roots = Array.isArray(diagnostics.browserRoots) ? diagnostics.browserRoots : [];
+  const rootSummary = roots.map((item) => `${item.root}: ${item.exists ? "found" : "missing"}`).join(" / ");
+  const core = diagnostics.playwrightCore && diagnostics.playwrightCore.available ? "OK" : "missing";
+  const full = diagnostics.playwright && diagnostics.playwright.available ? "OK" : "missing";
+  return `
+    <div class="fallback-diagnostics">
+      <span>截图诊断</span>
+      <strong>${safeHtml(report.fallbackReason || diagnostics.fallbackReason || "Playwright 没有完成截图流程。")}</strong>
+      <em>playwright-core ${safeHtml(core)} · playwright ${safeHtml(full)}</em>
+      <em>chromium: ${safeHtml(diagnostics.chromiumExecutablePath || "not found")}</em>
+      ${rootSummary ? `<em>${safeHtml(rootSummary)}</em>` : ""}
+    </div>
+  `;
+}
+
 
 function renderCompetitorPanel(analysis) {
   const search = analysis && analysis.competitorSearch ? analysis.competitorSearch : {};
@@ -608,6 +626,7 @@ function renderReport(report) {
       ${renderPreviewShot("移动端", report.screenshotPath, "当前使用 HTTP fallback 模式，没有生成移动端截图。")}
       ${renderPreviewShot("桌面端", report.desktopScreenshotPath, "当前使用 HTTP fallback 模式，没有生成桌面端截图。")}
     </div>
+    ${renderScreenshotDiagnostics(report)}
   `;
   const issues = report.issues && report.issues.length
     ? report.issues.map((issue) => `

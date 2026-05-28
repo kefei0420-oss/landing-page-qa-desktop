@@ -1446,6 +1446,36 @@ body {
   height: 178px;
 }
 
+.fallback-diagnostics {
+  margin-top: 14px;
+  border: 3px solid var(--line);
+  background: rgba(255, 224, 216, 0.72);
+  box-shadow: 4px 4px 0 var(--line);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.fallback-diagnostics span {
+  width: fit-content;
+  border: 3px solid var(--line);
+  background: var(--accent);
+  box-shadow: 3px 3px 0 var(--line);
+  padding: 3px 8px;
+  font-weight: 900;
+}
+
+.fallback-diagnostics strong {
+  font-size: 13px;
+}
+
+.fallback-diagnostics em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .preview-lightbox .lightbox-frame {
   position: relative;
   overflow: hidden;
