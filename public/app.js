@@ -162,7 +162,8 @@ function loadScript(src, attributes = {}) {
 
 function clerkFrontendApiFromKey(publishableKey) {
   try {
-    const encoded = String(publishableKey || "").replace(/^pk_(?:test|live)_/, "");
+    const parts = String(publishableKey || "").split("_");
+    const encoded = parts[2] || String(publishableKey || "").replace(/^pk_(?:test|live)_/, "");
     const decoded = atob(encoded).replace(/\$$/, "");
     return decoded || "";
   } catch (_) {
@@ -226,12 +227,15 @@ async function initAuth() {
     if (!authState.enabled) return;
     setToolLocked(true);
     runtimeStatus.textContent = "登录检查";
-    await loadScript("https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js", {
+    const frontendApi = clerkFrontendApiFromKey(config.clerkPublishableKey);
+    if (!frontendApi) throw new Error("Clerk Publishable Key 无法解析 Frontend API 域名");
+    await loadScript(`https://${frontendApi}/npm/@clerk/ui@1/dist/ui.browser.js`);
+    await loadScript(`https://${frontendApi}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`, {
       "data-clerk-publishable-key": config.clerkPublishableKey
     });
     const clerk = window.Clerk;
     if (!clerk || typeof clerk.load !== "function") throw new Error("Clerk SDK 未正确加载");
-    await clerk.load();
+    await clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
     authState.clerk = clerk;
     authState.ready = true;
     authState.signedIn = Boolean(clerk.user);
