@@ -137,9 +137,33 @@ async function gotoForScreenshot(page, targetUrl, timeout = 18000) {
   } catch (error) {
     result.error = error.message;
   }
-  await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => {});
-  await page.waitForLoadState("networkidle", { timeout: 1500 }).catch(() => {});
+  await page.waitForLoadState("domcontentloaded", { timeout: 3500 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 800 }).catch(() => {});
   return result;
+}
+
+function isSkippableRequest(request) {
+  const type = request.resourceType();
+  if (["media", "font"].includes(type)) return true;
+  const url = request.url();
+  return /googletagmanager|google-analytics|doubleclick|facebook\.net|connect\.facebook|tiktok|hotjar|clarity\.ms|pinterest|snapchat|redditstatic|klaviyo|yotpo|attentive|postscript|gorgias|intercom|zendesk|criteo/i.test(url);
+}
+
+async function speedUpPage(page) {
+  page.setDefaultTimeout(8000);
+  page.setDefaultNavigationTimeout(18000);
+  await page.route("**/*", (route) => {
+    const request = route.request();
+    if (isSkippableRequest(request)) return route.abort().catch(() => {});
+    return route.continue().catch(() => {});
+  }).catch(() => {});
+}
+
+async function safeScreenshot(page, options, timeout = 4500) {
+  return Promise.race([
+    page.screenshot(options),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Screenshot timed out.")), timeout))
+  ]);
 }
 
 function jsonResponse(res, status, body) {
@@ -1561,7 +1585,8 @@ async function callDeepSeekJson(payload) {
   const baseUrl = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
   const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
+  const aiTimeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS || 18000);
+  const timer = setTimeout(() => controller.abort(), Number.isFinite(aiTimeoutMs) ? aiTimeoutMs : 18000);
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -2029,17 +2054,18 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       locale: rules.locale
     });
     const page = await context.newPage();
-    const navigation = await gotoForScreenshot(page, targetUrl, 18000);
+    await speedUpPage(page);
+    const navigation = await gotoForScreenshot(page, targetUrl, 12000);
     const response = navigation.response;
-    await page.waitForTimeout(900).catch(() => {});
+    await page.waitForTimeout(350).catch(() => {});
     let popupDismissal = await dismissPopups(page);
-    await page.waitForTimeout(1200).catch(() => {});
+    await page.waitForTimeout(500).catch(() => {});
     const latePopupDismissal = await dismissPopups(page);
     popupDismissal = {
       clicked: Number(popupDismissal.clicked || 0) + Number(latePopupDismissal.clicked || 0),
       removed: Number(popupDismissal.removed || 0) + Number(latePopupDismissal.removed || 0)
     };
-    await page.waitForTimeout(250).catch(() => {});
+    await page.waitForTimeout(120).catch(() => {});
     const finalUrl = page.url();
     const loadMetrics = await page.evaluate(() => {
       const nav = performance.getEntriesByType("navigation")[0];
@@ -2071,24 +2097,50 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
     const loadMs = loadMetrics.firstContentfulPaintMs || loadMetrics.domContentLoadedMs || loadMetrics.loadMs || 0;
     const screenshotFile = LATEST_SCREENSHOT_FILE;
     const screenshotPath = path.join(REPORTS_DIR, screenshotFile);
-    await page.screenshot({ path: screenshotPath, fullPage: false });
+    let mobileScreenshotOk = false;
+    let mobileScreenshotError = "";
+    try {
+      await safeScreenshot(page, { path: screenshotPath, fullPage: false }, 4500);
+      mobileScreenshotOk = true;
+    } catch (error) {
+      mobileScreenshotError = error.message;
+    }
 
     const desktopScreenshotFile = LATEST_DESKTOP_SCREENSHOT_FILE;
     const desktopScreenshotPath = path.join(REPORTS_DIR, desktopScreenshotFile);
-    const desktopContext = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      deviceScaleFactor: 1,
-      locale: rules.locale
-    });
-    const desktopPage = await desktopContext.newPage();
-    const desktopNavigation = await gotoForScreenshot(desktopPage, finalUrl || targetUrl, 16000);
-    await desktopPage.waitForTimeout(900).catch(() => {});
-    await dismissPopups(desktopPage);
-    await desktopPage.waitForTimeout(700).catch(() => {});
-    await dismissPopups(desktopPage);
-    await desktopPage.screenshot({ path: desktopScreenshotPath, fullPage: false }).catch(() => {});
-    await desktopContext.close().catch(() => {});
+    let desktopScreenshotOk = false;
+    let desktopScreenshotError = "";
+    let desktopNavigation = { error: "Desktop screenshot skipped to keep scan responsive." };
+    if (Date.now() - startedAt < 18000) {
+      let desktopContext;
+      try {
+        desktopContext = await browser.newContext({
+          viewport: { width: 1440, height: 900 },
+          deviceScaleFactor: 1,
+          locale: rules.locale
+        });
+        const desktopPage = await desktopContext.newPage();
+        await speedUpPage(desktopPage);
+        desktopNavigation = await gotoForScreenshot(desktopPage, finalUrl || targetUrl, 9000);
+        await desktopPage.waitForTimeout(300).catch(() => {});
+        await dismissPopups(desktopPage);
+        await desktopPage.waitForTimeout(250).catch(() => {});
+        await dismissPopups(desktopPage);
+        try {
+          await safeScreenshot(desktopPage, { path: desktopScreenshotPath, fullPage: false }, 3500);
+          desktopScreenshotOk = true;
+        } catch (error) {
+          desktopScreenshotError = error.message;
+        }
+      } catch (error) {
+        desktopScreenshotError = error.message;
+      } finally {
+        if (desktopContext) await desktopContext.close().catch(() => {});
+      }
+    }
     loadMetrics.desktopNavigationError = desktopNavigation.error;
+    loadMetrics.mobileScreenshotError = mobileScreenshotError;
+    loadMetrics.desktopScreenshotError = desktopScreenshotError;
 
     const title = await page.title().catch(() => "");
     const text = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
@@ -2284,8 +2336,8 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       loadMetrics,
       runtimeDiagnostics: playwrightRuntimeDiagnostics({ mode: "playwright" }),
       popupDismissal,
-      screenshotPath: `reports/${screenshotFile}?t=${Date.now()}`,
-      desktopScreenshotPath: `reports/${desktopScreenshotFile}?t=${Date.now()}`,
+      screenshotPath: mobileScreenshotOk ? `reports/${screenshotFile}?t=${Date.now()}` : null,
+      desktopScreenshotPath: desktopScreenshotOk ? `reports/${desktopScreenshotFile}?t=${Date.now()}` : null,
       languageHint: resolvedRules.languageHint,
       promoSummary,
       productAnalysis,

@@ -660,10 +660,17 @@ function renderReport(report) {
   const category = analysis.productCategory || {};
   const smart = report.smartReview || {};
   const offerPrice = analysis.offer && analysis.offer.price ? analysis.offer.price : {};
+  const loadMetrics = report.loadMetrics || {};
+  const mobileShotEmpty = report.mode === "http-fallback"
+    ? "当前使用 HTTP fallback 模式，没有生成移动端截图。"
+    : (loadMetrics.mobileScreenshotError ? `移动端截图失败：${loadMetrics.mobileScreenshotError}` : "移动端截图未生成。");
+  const desktopShotEmpty = report.mode === "http-fallback"
+    ? "当前使用 HTTP fallback 模式，没有生成桌面端截图。"
+    : (loadMetrics.desktopScreenshotError || loadMetrics.desktopNavigationError || "桌面端截图未生成或为保持响应速度已跳过。");
   const screenshots = `
     <div class="device-console">
-      ${renderPreviewShot("移动端", report.screenshotPath, "当前使用 HTTP fallback 模式，没有生成移动端截图。")}
-      ${renderPreviewShot("桌面端", report.desktopScreenshotPath, "当前使用 HTTP fallback 模式，没有生成桌面端截图。")}
+      ${renderPreviewShot("移动端", report.screenshotPath, mobileShotEmpty)}
+      ${renderPreviewShot("桌面端", report.desktopScreenshotPath, desktopShotEmpty)}
     </div>
     ${renderScreenshotDiagnostics(report)}
   `;
