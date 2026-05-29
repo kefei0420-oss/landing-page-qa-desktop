@@ -129,6 +129,19 @@ function playwrightRuntimeDiagnostics(extra = {}) {
   };
 }
 
+async function gotoForScreenshot(page, targetUrl, timeout = 18000) {
+  const result = { response: null, error: "", committed: false };
+  try {
+    result.response = await page.goto(targetUrl, { waitUntil: "commit", timeout });
+    result.committed = true;
+  } catch (error) {
+    result.error = error.message;
+  }
+  await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 1500 }).catch(() => {});
+  return result;
+}
+
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
@@ -2016,8 +2029,8 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       locale: rules.locale
     });
     const page = await context.newPage();
-    const response = await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
+    const navigation = await gotoForScreenshot(page, targetUrl, 18000);
+    const response = navigation.response;
     await page.waitForTimeout(900).catch(() => {});
     let popupDismissal = await dismissPopups(page);
     await page.waitForTimeout(1200).catch(() => {});
@@ -2054,6 +2067,7 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
         transferSize: 0
       };
     }).catch(() => ({ source: "unavailable", loadMs: Date.now() - startedAt }));
+    loadMetrics.navigationError = navigation.error;
     const loadMs = loadMetrics.firstContentfulPaintMs || loadMetrics.domContentLoadedMs || loadMetrics.loadMs || 0;
     const screenshotFile = LATEST_SCREENSHOT_FILE;
     const screenshotPath = path.join(REPORTS_DIR, screenshotFile);
@@ -2067,14 +2081,14 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       locale: rules.locale
     });
     const desktopPage = await desktopContext.newPage();
-    await desktopPage.goto(finalUrl || targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => null);
-    await desktopPage.waitForLoadState("networkidle", { timeout: 2500 }).catch(() => {});
+    const desktopNavigation = await gotoForScreenshot(desktopPage, finalUrl || targetUrl, 16000);
     await desktopPage.waitForTimeout(900).catch(() => {});
     await dismissPopups(desktopPage);
     await desktopPage.waitForTimeout(700).catch(() => {});
     await dismissPopups(desktopPage);
     await desktopPage.screenshot({ path: desktopScreenshotPath, fullPage: false }).catch(() => {});
     await desktopContext.close().catch(() => {});
+    loadMetrics.desktopNavigationError = desktopNavigation.error;
 
     const title = await page.title().catch(() => "");
     const text = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
