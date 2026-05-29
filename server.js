@@ -18,6 +18,8 @@ const BUNDLED_NODE_MODULES =
   "/Users/kefei/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules";
 const COMPETITOR_SEARCH_CACHE = new Map();
 const COMPETITOR_CACHE_TTL_MS = 1000 * 60 * 30;
+const CLERK_EMAIL_CACHE = new Map();
+const CLERK_EMAIL_CACHE_TTL_MS = 1000 * 60 * 60;
 
 fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
@@ -100,7 +102,17 @@ function chromiumLaunchOptions() {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findBundledChromiumExecutable();
   return {
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-background-networking",
+      "--disable-extensions",
+      "--disable-sync",
+      "--no-first-run",
+      "--no-default-browser-check"
+    ],
     ...(executablePath ? { executablePath } : {})
   };
 }
@@ -166,6 +178,10 @@ async function safeScreenshot(page, options, timeout = 4500) {
   ]);
 }
 
+function desktopScreenshotEnabled() {
+  return /^(1|true|yes|on)$/i.test(String(process.env.ENABLE_DESKTOP_SCREENSHOT || ""));
+}
+
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
@@ -202,6 +218,8 @@ function primaryEmailFromClerkPayload(payload) {
 
 async function fetchClerkUserPrimaryEmail(userId) {
   if (!userId || !hasRealEnvValue(process.env.CLERK_SECRET_KEY)) return "";
+  const cached = CLERK_EMAIL_CACHE.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.email;
   try {
     const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(userId)}`, {
       headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
@@ -210,7 +228,9 @@ async function fetchClerkUserPrimaryEmail(userId) {
     const user = await response.json();
     const emails = Array.isArray(user.email_addresses) ? user.email_addresses : [];
     const primary = emails.find((item) => item.id === user.primary_email_address_id) || emails[0];
-    return String(primary && primary.email_address || "").toLowerCase();
+    const email = String(primary && primary.email_address || "").toLowerCase();
+    if (email) CLERK_EMAIL_CACHE.set(userId, { email, expiresAt: Date.now() + CLERK_EMAIL_CACHE_TTL_MS });
+    return email;
   } catch (_) {
     return "";
   }
@@ -2110,8 +2130,8 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
     const desktopScreenshotPath = path.join(REPORTS_DIR, desktopScreenshotFile);
     let desktopScreenshotOk = false;
     let desktopScreenshotError = "";
-    let desktopNavigation = { error: "Desktop screenshot skipped to keep scan responsive." };
-    if (Date.now() - startedAt < 18000) {
+    let desktopNavigation = { error: "桌面端截图已默认关闭，以降低 Render 免费实例内存占用。" };
+    if (desktopScreenshotEnabled() && Date.now() - startedAt < 18000) {
       let desktopContext;
       try {
         desktopContext = await browser.newContext({
@@ -2257,6 +2277,9 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       keyword,
       found: textIncludes(text, keyword)
     }));
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+    browser = null;
     const aiEnhancement = await enhanceProductAnalysisWithAi({
       targetUrl,
       finalUrl,

@@ -354,6 +354,29 @@ button:disabled {
 .scan-window span:nth-child(3) { animation-delay: 240ms; }
 .scan-window span:nth-child(4) { animation-delay: 360ms; }
 
+/* Calmer motion: keep the console alive without turning the page into noise. */
+.idle-state::before,
+.scanning-state::before,
+.scan-window span,
+.scan-steps span,
+.scan-line,
+.scanner-card::after,
+.command-bar.is-scanning::before,
+.metric-strip div,
+.summary-card,
+.analysis-card {
+  animation: none !important;
+}
+
+.idle-state::before,
+.scanning-state::before {
+  opacity: 0.34;
+}
+
+.command-bar.is-scanning::before {
+  display: none;
+}
+
 .scanner-card {
   width: min(920px, 86vw);
 }
@@ -368,7 +391,14 @@ button:disabled {
     var(--paper-2);
   background-size: 34% 100%, 100% 100%;
   background-repeat: no-repeat;
-  animation: scanSweep 1.15s linear infinite;
+}
+
+.scan-line::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  width: 34%;
+  background: rgba(255, 204, 51, 0.72);
 }
 
 .scan-steps {
@@ -1488,15 +1518,6 @@ body {
   pointer-events: none;
   background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(255, 204, 51, 0.08) 9px 11px);
   animation: screenScan 850ms linear infinite;
-}
-
-.scanner-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(110deg, transparent 0 34%, rgba(255, 204, 51, 0.28) 48%, transparent 62%);
-  animation: commandScan 900ms linear infinite;
 }
 
 @keyframes commandScan {
