@@ -13,6 +13,7 @@ const authState = {
   ready: false,
   signedIn: true,
   allowed: true,
+  accessError: "",
   allowlistEnabled: false,
   allowedEmailDomains: [],
   clerk: null
@@ -193,13 +194,25 @@ function currentUserEmail() {
 function renderAccessDenied(email = "") {
   setToolLocked(true);
   runtimeStatus.textContent = "无权限";
-  const domains = authState.allowedEmailDomains.length ? `当前只开放给：${authState.allowedEmailDomains.join(" / ")}` : "当前账号不在访问白名单里。";
+  const mount = document.querySelector("#authMount");
+  if (mount) {
+    mount.innerHTML = `
+      <div class="auth-status auth-status-denied">
+        <div class="auth-status-copy">
+          <span>已登录 · 未授权</span>
+          <strong>${safeHtml(email || "Unauthorized user")}</strong>
+        </div>
+      </div>
+    `;
+  }
+  const domains = authState.allowedEmailDomains.length ? `白名单域名提示：${authState.allowedEmailDomains.join(" / ")}。` : "";
+  const reason = authState.accessError ? `${authState.accessError} ` : "";
   resultPanel.innerHTML = `
     <div class="empty-state auth-state">
       <div class="auth-card denied-card">
         <span class="slant-tag">ACCESS DENIED</span>
         <h2>没有访问权限</h2>
-        <p>${safeHtml(email || "当前账号")} 不在白名单里。${safeHtml(domains)}</p>
+        <p>${safeHtml(email || "当前账号")} 没有通过后端白名单校验。${safeHtml(reason)}${safeHtml(domains)}请确认 Render 的 ALLOWED_EMAILS 填的是完整邮箱。</p>
         <button class="competitor-deep-btn" type="button" data-action="sign-out">切换账号</button>
       </div>
     </div>
@@ -230,11 +243,14 @@ async function refreshAccess() {
   }
   try {
     const response = await apiFetch(`${API_BASE}/api/me`);
+    const data = await readApiJson(response).catch(() => ({}));
     authState.allowed = response.ok;
+    authState.accessError = response.ok ? "" : (data.error || "");
     if (!response.ok) return false;
     return true;
   } catch (_) {
     authState.allowed = false;
+    authState.accessError = "无法完成后端权限校验。";
     return false;
   }
 }

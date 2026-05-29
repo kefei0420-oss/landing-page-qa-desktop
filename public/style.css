@@ -2066,6 +2066,18 @@ body {
   padding: 0;
 }
 
+.auth-status-denied {
+  background: #ffe0d8;
+}
+
+.auth-status-denied .auth-status-copy {
+  text-align: left;
+}
+
+.auth-status-denied .auth-status-copy span {
+  color: var(--red);
+}
+
 .auth-state {
   min-height: 460px;
 }

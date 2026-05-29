@@ -204,8 +204,11 @@ async function verifyClerkRequest(req) {
     if (allowlist.length && !email) {
       email = await fetchClerkUserPrimaryEmail(payload.sub);
     }
-    if (allowlist.length && (!email || !allowlist.includes(email))) {
-      return { ok: false, status: 403, error: "这个邮箱没有访问权限。" };
+    if (allowlist.length && !email) {
+      return { ok: false, status: 403, error: "后端没有从 Clerk 读取到登录邮箱，请检查 CLERK_SECRET_KEY。" };
+    }
+    if (allowlist.length && !allowlist.includes(email)) {
+      return { ok: false, status: 403, error: `邮箱 ${email} 不在访问白名单里。` };
     }
     return { ok: true, userId: payload.sub, email, payload };
   } catch (error) {
