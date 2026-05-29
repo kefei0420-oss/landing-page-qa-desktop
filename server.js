@@ -178,10 +178,6 @@ async function safeScreenshot(page, options, timeout = 4500) {
   ]);
 }
 
-function desktopScreenshotEnabled() {
-  return /^(1|true|yes|on)$/i.test(String(process.env.ENABLE_DESKTOP_SCREENSHOT || ""));
-}
-
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
@@ -2115,49 +2111,13 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
     }).catch(() => ({ source: "unavailable", loadMs: Date.now() - startedAt }));
     loadMetrics.navigationError = navigation.error;
     const loadMs = loadMetrics.firstContentfulPaintMs || loadMetrics.domContentLoadedMs || loadMetrics.loadMs || 0;
-    const screenshotFile = LATEST_SCREENSHOT_FILE;
-    const screenshotPath = path.join(REPORTS_DIR, screenshotFile);
     let mobileScreenshotOk = false;
-    let mobileScreenshotError = "";
-    try {
-      await safeScreenshot(page, { path: screenshotPath, fullPage: false }, 4500);
-      mobileScreenshotOk = true;
-    } catch (error) {
-      mobileScreenshotError = error.message;
-    }
+    let mobileScreenshotError = "截图已改为手动生成，以降低主分析内存占用。";
 
     const desktopScreenshotFile = LATEST_DESKTOP_SCREENSHOT_FILE;
-    const desktopScreenshotPath = path.join(REPORTS_DIR, desktopScreenshotFile);
     let desktopScreenshotOk = false;
-    let desktopScreenshotError = "";
-    let desktopNavigation = { error: "桌面端截图已默认关闭，以降低 Render 免费实例内存占用。" };
-    if (desktopScreenshotEnabled() && Date.now() - startedAt < 18000) {
-      let desktopContext;
-      try {
-        desktopContext = await browser.newContext({
-          viewport: { width: 1440, height: 900 },
-          deviceScaleFactor: 1,
-          locale: rules.locale
-        });
-        const desktopPage = await desktopContext.newPage();
-        await speedUpPage(desktopPage);
-        desktopNavigation = await gotoForScreenshot(desktopPage, finalUrl || targetUrl, 9000);
-        await desktopPage.waitForTimeout(300).catch(() => {});
-        await dismissPopups(desktopPage);
-        await desktopPage.waitForTimeout(250).catch(() => {});
-        await dismissPopups(desktopPage);
-        try {
-          await safeScreenshot(desktopPage, { path: desktopScreenshotPath, fullPage: false }, 3500);
-          desktopScreenshotOk = true;
-        } catch (error) {
-          desktopScreenshotError = error.message;
-        }
-      } catch (error) {
-        desktopScreenshotError = error.message;
-      } finally {
-        if (desktopContext) await desktopContext.close().catch(() => {});
-      }
-    }
+    let desktopScreenshotError = "截图已改为手动生成，以降低主分析内存占用。";
+    let desktopNavigation = { error: "截图已改为手动生成。" };
     loadMetrics.desktopNavigationError = desktopNavigation.error;
     loadMetrics.mobileScreenshotError = mobileScreenshotError;
     loadMetrics.desktopScreenshotError = desktopScreenshotError;
@@ -2359,7 +2319,7 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
       loadMetrics,
       runtimeDiagnostics: playwrightRuntimeDiagnostics({ mode: "playwright" }),
       popupDismissal,
-      screenshotPath: mobileScreenshotOk ? `reports/${screenshotFile}?t=${Date.now()}` : null,
+      screenshotPath: mobileScreenshotOk ? `reports/${LATEST_SCREENSHOT_FILE}?t=${Date.now()}` : null,
       desktopScreenshotPath: desktopScreenshotOk ? `reports/${desktopScreenshotFile}?t=${Date.now()}` : null,
       languageHint: resolvedRules.languageHint,
       promoSummary,
@@ -2406,6 +2366,63 @@ async function handleCheck(req, res) {
     cleanupReportCache();
 
     jsonResponse(res, 200, report);
+  } catch (error) {
+    jsonResponse(res, 500, { error: error.message });
+  }
+}
+
+async function captureScreenshot(targetUrl, device) {
+  const playwright = tryRequirePlaywright();
+  if (!playwright) throw new Error("Playwright is not available.");
+  const startedAt = Date.now();
+  const { chromium, devices } = playwright;
+  let browser;
+  let context;
+  try {
+    browser = await chromium.launch(chromiumLaunchOptions());
+    const isDesktop = device === "desktop";
+    context = await browser.newContext(isDesktop
+      ? { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: "en-US" }
+      : { ...devices["iPhone 13"], locale: "en-US" });
+    const page = await context.newPage();
+    await speedUpPage(page);
+    const navigation = await gotoForScreenshot(page, targetUrl, isDesktop ? 9000 : 11000);
+    await page.waitForTimeout(350).catch(() => {});
+    await dismissPopups(page);
+    await page.waitForTimeout(350).catch(() => {});
+    await dismissPopups(page);
+    const file = isDesktop ? LATEST_DESKTOP_SCREENSHOT_FILE : LATEST_SCREENSHOT_FILE;
+    const screenshotPath = path.join(REPORTS_DIR, file);
+    await safeScreenshot(page, { path: screenshotPath, fullPage: false }, isDesktop ? 5000 : 6000);
+    return {
+      device: isDesktop ? "desktop" : "mobile",
+      path: `reports/${file}?t=${Date.now()}`,
+      finalUrl: page.url(),
+      navigationError: navigation.error || "",
+      elapsedMs: Date.now() - startedAt
+    };
+  } finally {
+    if (context) await context.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
+async function handleScreenshot(req, res) {
+  try {
+    const auth = await requireApiAuth(req, res);
+    if (!auth) return;
+    const body = await parseBody(req);
+    const targetUrl = String(body.url || "").trim();
+    const device = String(body.device || "mobile").toLowerCase() === "desktop" ? "desktop" : "mobile";
+    if (!targetUrl) return jsonResponse(res, 400, { error: "URL is required." });
+    try {
+      const parsed = new URL(targetUrl);
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error("Unsupported protocol");
+    } catch (_) {
+      return jsonResponse(res, 400, { error: "Please enter a valid http or https URL." });
+    }
+    const screenshot = await captureScreenshot(targetUrl, device);
+    jsonResponse(res, 200, screenshot);
   } catch (error) {
     jsonResponse(res, 500, { error: error.message });
   }
@@ -2475,6 +2492,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === "POST" && req.url === "/api/check") {
     handleCheck(req, res);
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/screenshot") {
+    handleScreenshot(req, res);
     return;
   }
   if (req.method === "POST" && req.url === "/api/competitors") {

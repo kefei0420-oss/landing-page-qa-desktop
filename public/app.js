@@ -548,6 +548,19 @@ function renderPreviewShot(label, path, emptyText) {
   `;
 }
 
+function renderScreenshotSlot(device, label, path, emptyText) {
+  if (path) return renderPreviewShot(label, path, "");
+  return `
+    <div class="screenshot-slot" data-shot-slot="${safeHtml(device)}">
+      <span class="device-label">${safeHtml(device === "desktop" ? "DESKTOP" : "MOBILE")}</span>
+      <div class="shot-empty">${safeHtml(emptyText)}</div>
+      <button class="shot-generate-btn" type="button" data-action="generate-screenshot" data-device="${safeHtml(device)}">
+        生成${safeHtml(label)}截图
+      </button>
+    </div>
+  `;
+}
+
 function renderScreenshotDiagnostics(report) {
   if (!report || report.mode !== "http-fallback") return "";
   const diagnostics = report.runtimeDiagnostics || {};
@@ -661,16 +674,12 @@ function renderReport(report) {
   const smart = report.smartReview || {};
   const offerPrice = analysis.offer && analysis.offer.price ? analysis.offer.price : {};
   const loadMetrics = report.loadMetrics || {};
-  const mobileShotEmpty = report.mode === "http-fallback"
-    ? "当前使用 HTTP fallback 模式，没有生成移动端截图。"
-    : (loadMetrics.mobileScreenshotError ? `移动端截图失败：${loadMetrics.mobileScreenshotError}` : "移动端截图未生成。");
-  const desktopShotEmpty = report.mode === "http-fallback"
-    ? "当前使用 HTTP fallback 模式，没有生成桌面端截图。"
-    : (loadMetrics.desktopScreenshotError || loadMetrics.desktopNavigationError || "桌面端截图未生成或为保持响应速度已跳过。");
+  const mobileShotEmpty = "分析已完成，按需生成移动端首屏截图。";
+  const desktopShotEmpty = "分析已完成，按需生成桌面端首屏截图。";
   const screenshots = `
     <div class="device-console">
-      ${renderPreviewShot("移动端", report.screenshotPath, mobileShotEmpty)}
-      ${renderPreviewShot("桌面端", report.desktopScreenshotPath, desktopShotEmpty)}
+      ${renderScreenshotSlot("mobile", "移动端", report.screenshotPath, mobileShotEmpty)}
+      ${renderScreenshotSlot("desktop", "桌面端", report.desktopScreenshotPath, desktopShotEmpty)}
     </div>
     ${renderScreenshotDiagnostics(report)}
   `;
@@ -836,14 +845,13 @@ form.addEventListener("submit", async (event) => {
       <div class="scanner-card">
         <span class="slant-tag">SCANNING</span>
         <h2>正在扫描落地页</h2>
-        <p>页面打开、弹窗清理、双端截图和信息提取正在依次进行。</p>
+        <p>页面抓取、弹窗处理、信息提取和 AI 结构化正在进行；截图可在结果页按需生成。</p>
         <div class="scan-line"></div>
         <div class="scan-steps">
           <span>OPEN PAGE</span>
           <span>CLEAN POPUPS</span>
-          <span>MOBILE SHOT</span>
-          <span>DESKTOP SHOT</span>
           <span>EXTRACT INFO</span>
+          <span>AI REVIEW</span>
           <span>SCORE</span>
         </div>
       </div>
@@ -925,6 +933,44 @@ document.addEventListener("click", async (event) => {
   } finally {
     button.disabled = false;
     button.textContent = deep ? "重新 PDP 下钻" : "重新搜索竞品 · 约 1 credit";
+  }
+});
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-action="generate-screenshot"]');
+  if (!button || !lastReport) return;
+  const device = button.dataset.device === "desktop" ? "desktop" : "mobile";
+  const slot = button.closest("[data-shot-slot]");
+  button.disabled = true;
+  button.textContent = "生成中...";
+  if (slot) slot.classList.add("is-generating");
+  try {
+    const response = await apiFetch(`${API_BASE}/api/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: lastReport.finalUrl || lastReport.url,
+        device
+      })
+    });
+    const data = await readApiJson(response);
+    if (!response.ok) throw new Error(data.error || "Screenshot failed");
+    if (device === "desktop") {
+      lastReport.desktopScreenshotPath = data.path;
+    } else {
+      lastReport.screenshotPath = data.path;
+    }
+    if (slot) {
+      slot.outerHTML = renderPreviewShot(device === "desktop" ? "桌面端" : "移动端", data.path, "");
+    }
+  } catch (error) {
+    if (slot) {
+      slot.classList.remove("is-generating");
+      const note = slot.querySelector(".shot-empty");
+      if (note) note.textContent = `截图失败：${error.message}`;
+    }
+    button.disabled = false;
+    button.textContent = `重试${device === "desktop" ? "桌面端" : "移动端"}截图`;
   }
 });
 
