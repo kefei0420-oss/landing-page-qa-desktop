@@ -196,6 +196,10 @@ function clerkAuthEnabled() {
   return hasRealEnvValue(process.env.CLERK_SECRET_KEY) && hasRealEnvValue(process.env.CLERK_PUBLISHABLE_KEY);
 }
 
+function desktopScreenshotEnabled() {
+  return /^(1|true|yes|on)$/i.test(String(process.env.DESKTOP_SCREENSHOT || ""));
+}
+
 function allowedEmails() {
   return String(process.env.ALLOWED_EMAILS || "")
     .split(",")
@@ -2111,13 +2115,49 @@ async function checkWithPlaywright(targetUrl, country, keywords) {
     }).catch(() => ({ source: "unavailable", loadMs: Date.now() - startedAt }));
     loadMetrics.navigationError = navigation.error;
     const loadMs = loadMetrics.firstContentfulPaintMs || loadMetrics.domContentLoadedMs || loadMetrics.loadMs || 0;
+    const screenshotFile = LATEST_SCREENSHOT_FILE;
+    const screenshotPath = path.join(REPORTS_DIR, screenshotFile);
     let mobileScreenshotOk = false;
-    let mobileScreenshotError = "截图已改为手动生成，以降低主分析内存占用。";
+    let mobileScreenshotError = "";
+    try {
+      await safeScreenshot(page, { path: screenshotPath, fullPage: false }, 4500);
+      mobileScreenshotOk = true;
+    } catch (error) {
+      mobileScreenshotError = error.message;
+    }
 
     const desktopScreenshotFile = LATEST_DESKTOP_SCREENSHOT_FILE;
+    const desktopScreenshotPath = path.join(REPORTS_DIR, desktopScreenshotFile);
     let desktopScreenshotOk = false;
-    let desktopScreenshotError = "截图已改为手动生成，以降低主分析内存占用。";
-    let desktopNavigation = { error: "截图已改为手动生成。" };
+    let desktopScreenshotError = "";
+    let desktopNavigation = { error: "桌面端截图已默认关闭，以降低实例内存占用。" };
+    if (desktopScreenshotEnabled() && Date.now() - startedAt < 18000) {
+      let desktopContext;
+      try {
+        desktopContext = await browser.newContext({
+          viewport: { width: 1440, height: 900 },
+          deviceScaleFactor: 1,
+          locale: rules.locale
+        });
+        const desktopPage = await desktopContext.newPage();
+        await speedUpPage(desktopPage);
+        desktopNavigation = await gotoForScreenshot(desktopPage, finalUrl || targetUrl, 9000);
+        await desktopPage.waitForTimeout(300).catch(() => {});
+        await dismissPopups(desktopPage);
+        await desktopPage.waitForTimeout(250).catch(() => {});
+        await dismissPopups(desktopPage);
+        try {
+          await safeScreenshot(desktopPage, { path: desktopScreenshotPath, fullPage: false }, 3500);
+          desktopScreenshotOk = true;
+        } catch (error) {
+          desktopScreenshotError = error.message;
+        }
+      } catch (error) {
+        desktopScreenshotError = error.message;
+      } finally {
+        if (desktopContext) await desktopContext.close().catch(() => {});
+      }
+    }
     loadMetrics.desktopNavigationError = desktopNavigation.error;
     loadMetrics.mobileScreenshotError = mobileScreenshotError;
     loadMetrics.desktopScreenshotError = desktopScreenshotError;

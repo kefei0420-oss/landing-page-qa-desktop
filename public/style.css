@@ -31,6 +31,12 @@ body {
   cursor: crosshair;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .cursor-dot {
   position: fixed;
   left: -12px;
@@ -46,9 +52,10 @@ body {
 }
 
 .shell {
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   padding: 22px;
+  overflow-x: clip;
 }
 
 .topbar {
@@ -359,7 +366,6 @@ button:disabled {
 .scanning-state::before,
 .scan-window span,
 .scan-steps span,
-.scan-line,
 .scanner-card::after,
 .command-bar.is-scanning::before,
 .metric-strip div,
@@ -391,17 +397,14 @@ button:disabled {
     var(--paper-2);
   background-size: 34% 100%, 100% 100%;
   background-repeat: no-repeat;
+  background-position: -44% 0, 0 0;
 }
 
 .scan-line::after {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  width: 34%;
-  background: rgba(255, 204, 51, 0.72);
+  display: none;
 }
 
-.scanning-state .scan-line::after {
+.scanning-state .scan-line {
   animation: scanBarMove 1.1s linear infinite;
 }
 
@@ -1573,8 +1576,8 @@ body {
 }
 
 @keyframes scanBarMove {
-  from { transform: translateX(0); }
-  to { transform: translateX(190%); }
+  from { background-position: -44% 0, 0 0; }
+  to { background-position: 144% 0, 0 0; }
 }
 
 @media (max-width: 1180px) {

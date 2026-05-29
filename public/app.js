@@ -674,8 +674,8 @@ function renderReport(report) {
   const smart = report.smartReview || {};
   const offerPrice = analysis.offer && analysis.offer.price ? analysis.offer.price : {};
   const loadMetrics = report.loadMetrics || {};
-  const mobileShotEmpty = "分析已完成，按需生成移动端首屏截图。";
-  const desktopShotEmpty = "分析已完成，按需生成桌面端首屏截图。";
+  const mobileShotEmpty = "自动截图失败，可点击重新生成移动端首屏。";
+  const desktopShotEmpty = "桌面端未自动生成，可点击生成桌面端截图。";
   const screenshots = `
     <div class="device-console">
       ${renderScreenshotSlot("mobile", "移动端", report.screenshotPath, mobileShotEmpty)}
@@ -845,7 +845,7 @@ form.addEventListener("submit", async (event) => {
       <div class="scanner-card">
         <span class="slant-tag">SCANNING</span>
         <h2>正在扫描落地页</h2>
-        <p>页面抓取、弹窗处理、信息提取和 AI 结构化正在进行；截图可在结果页按需生成。</p>
+        <p>页面抓取、弹窗处理、首屏截图、信息提取和 AI 结构化正在进行。</p>
         <div class="scan-line"></div>
         <div class="scan-steps">
           <span>OPEN PAGE</span>
